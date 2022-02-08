@@ -1,0 +1,89 @@
+,,,;======================================================
+,,,;PROGRAMA PARA CONTROLAR UM MOTOR CC POR PWM COM DOIS
+,,,;BOTÕES PARA AUMANTAR E DIMINUIR A VELOCIDADE DO MOTOR
+,,,;-------------------- PINAGEM -------------------------
+,,,; SAÍDA DOS PULSOS -> P1.0
+,,,; INTERRUPÇÃO EXT -> P3.1
+,,,; BOTÕES DE AUMENTO E DIMINUIÇÃO DE VELOCIDADE -> P2.0
+,,,; E P2.1
+,,,;------------------------------------------------------
+,,,; DESENVOLVIDO POR: JOHN DAYTON CHAVES CUTÓDIO
+,,,; DATA DE DESENVOLVIMENTO: 24/08/2013
+,,,; ULTIMA ATUALIZAÇÃO: 24/08/2013
+,,,;======================================================
+,,,;---------------- DEFINIÇÕES DAS FLAGS ----------------
+,,,FLAG    EQU     00H
+000B,,,MOTOR   EQU     P1.0
+000B,,,BOT_0   EQU     P2.0
+000B,,,BOT_1   EQU     P2.1
+,,,;------------- DESVIOS DE IMTERRUPÇÕES ----------------
+,,,        ORG     00H
+0000,01 47,,        AJMP    INICIO
+,,,        ORG     03H
+0003,01 0D,,        AJMP    EXT_0
+,,,        ORG     0BH
+000B,01 22,,        AJMP    TIMR_0
+,,,;================= INTERRUPÇÕES =======================
+,,,;------------------- EXTERNA 0 ------------------------
+000D,30 A0 09,EXT_0,EXT_0:  JNB     BOT_0,MAIS      ;ANALISA QUAL FOI O BOTÃO PRESSIONADO
+,,,                                ;SE FOR BOT_0 IRÁ SALTAR PARA (MAIS)
+,,,
+0010,B9 32 01,MENOS,MENOS:  CJNE    R1,#50,SEG1     ;VERIFICA SE R1 JÁ É MÁXIMO
+0013,32,,        RETI                    ;SAI DA INTERRUPÇÃO SE O VALOR FOR MÁXIMO
+0014,09,SEG1,SEG1:   INC     R1              ;SE O VALOR NÃO FOR MÁXIMO INCREMENTA R1 E DECREMENTA R0
+0015,18,,        DEC     R0
+0016,E9,,        MOV     A,R1
+0017,FB,,        MOV     R3,A            ;REPASSA O VALOR DE R1 PARA R3
+0018,32,,        RETI                    ;SAI DA INTERRUPÇÃO
+,,,
+0019,B8 32 01,MAIS,MAIS:   CJNE    R0,#50,SEG2     ;VERIFICA SE R0 JÁ É MÁXIMO
+001C,32,,        RETI                    ;SAI DA INTERRUPÇÃO SE O VALOR FOR MÁXIMO
+001D,08,SEG2,SEG2:   INC     R0              ;SE O VALOR NÃO FOR MÁXIMO INCREMENTA R0 E DECREMENTA R1
+001E,19,,        DEC     R1
+001F,E8,,        MOV     A,R0
+0020,FA,,        MOV     R2,A            ;REPASSA O VALOR DE R0 PARA R2
+0021,32,,        RETI                    ;;SAI DA INTERRUPÇÃO
+,,,
+,,,;------------------ TIMER 0 ---------------------------
+0022,20 00 11,TIMR_0,TIMR_0: JB      FLAG,ROT_2      ;VERIFICAÇÃO DE QUAL ESTADO ATUAL DO PINO MOTOR
+,,,                        ;ROTINA PARA TEMPO BAIXO
+0025,C2 90,ROT_1,ROT_1:  CLR     MOTOR           ;LIMPA VALOR DO PINO DO MOTOR
+0027,BB 00 01,,        CJNE    R3,#0,PART_1    ;COMPARA R3 COM 0 SALTA PARA (PART_1) SE DIFERENTE
+002A,32,,        RETI                    ;SAI DA INTERRUPÇÃO
+002B,DB 19,PART_1,PART_1: DJNZ    R3,SAI_T0       ;DECREMENTA R3 E DESVIA SE FOR DIFERENTE DE 0
+002D,E9,,        MOV     A,R1
+002E,FB,,        MOV     R3,A            ;CARREGA O VALOR DE R1 EM R3 NOVAMENTE
+002F,BB 32 01,,        CJNE    R3,#50,PART_5   ;COMPARA VALOR DE R3 COM O MÁXIMO E NÃO ALTERA A FLAG SE IGUAL
+0032,32,,        RETI
+0033,B2 00,PART_5,PART_5: CPL     FLAG            ;INVERTE O VALOR DA FLAG
+0035,32,,        RETI
+,,,                        ;ROTINA PARA TEMPO ALTO
+0036,D2 90,ROT_2,ROT_2:  SETB    MOTOR           ;SETA VALOR DO PINO DO MOTOR
+0038,BA 00 01,,        CJNE    R2,#0,PART_2    ;COMPARA R2 COM 0 E SALTA PARA (PART_2) SE DIFERENTE
+003B,32,,        RETI                    ;SAI DA INTERRUPÇÃO
+003C,DA 08,PART_2,PART_2: DJNZ    R2,SAI_T0       ;DECREMENTA R2 E DESVIA SE FOR DIFERENTE DE 0
+003E,E8,,        MOV     A,R0
+003F,FA,,        MOV     R2,A            ;CARREGA O VALOR DE R0 EM R2
+0040,BA 32 01,,        CJNE    R2,#50,PART_4   ;COMPARA VALOR DE R2 COM O MÁXIMO E NÃO ALTERA A FLAG SE IGUAL
+0043,32,,        RETI
+0044,B2 00,PART_4,PART_4: CPL     FLAG            ;INVERTE O VALOR DA FLAG
+0046,32,SAI_T0,SAI_T0: RETI                    ;SAI DA INTERRUPÇÃO
+,,,;---------------- ROTINA PRINCIPAL --------------------
+0047,75 81 2F,INICIO,INICIO: MOV     SP,#2FH         ;DESLOCAMENTO DA PILHA
+004A,75 A8 83,,        MOV     IE,#83H         ;HABILITAÇÃO DAS INTERRUPÇÕES
+,,,                                ;HABILITA O TIMER0 O EXT_0 E A HABILITAÇÃO GERAL
+004D,75 B8 02,,        MOV     IP,#02H         ;PRIORIDADES DAS INTERRUPÇÕES
+,,,                                ;PRIORIDADE MAIOR PARA TIMER0
+0050,75 89 02,,        MOV     TMOD,#02H       ;TIMR_0 EM MODO 2
+0053,75 8C EC,,        MOV     TH0,#0ECH       ;CHAMADA A CADA 20us
+0056,75 8A EC,,        MOV     TL0,#0ECH       ;PARA FREQUENCIA DE 1KHZ
+0059,D2 8C,,        SETB    TR0             ;LIGA O TIMER0
+005B,D2 88,,        SETB    IT0             ;HABILITA O TIMER0 PARA BORDA DE DESCIDA
+005D,78 00,,        MOV     R0,#0           ;AUXILIAR DE R2 PARA AUMENTAR O VALOR DE TEMPO LIGADOO
+005F,7A 00,,        MOV     R2,#0
+0061,79 32,,        MOV     R1,#50          ;AUXILIAR DE R3 PARA AUMENTAR O VALOR DE TEMPO DESLIGADO
+0063,7B 32,,        MOV     R3,#50
+0065,C2 00,,        CLR     FLAG
+0067,01 67,,        AJMP    $               ;AGUARDA AS INTERRUPÇÕES
+,,,;------------------- FIM DO PROGRAMA ------------------
+000E,,,        END
